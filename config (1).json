@@ -1,0 +1,11 @@
+{
+  "agency_name": "Quattro Marketing",
+  "client_name": "International de Baja California",
+  "account_id": "act_1043787234524197",
+  "since": "2026-01-01",
+  "until": "today",
+  "period_label": "2026",
+  "show_campaign_breakdown": true,
+  "output_dir": "docs",
+  "output_filename": "international-bc.html"
+}
