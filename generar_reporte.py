@@ -113,6 +113,26 @@ def fetch_range_insights(account_id, token, since, until):
     }
 
 
+def classify_objective(name, wa_count, lead_count, reach):
+    """Clasifica el objetivo de una campana (o anuncio) por palabras clave
+    en su nombre -- reutilizado tanto por el desglose por campana como
+    por el top de anuncios por campana."""
+    name_lower = name.lower()
+    if "reconocimiento" in name_lower or "awareness" in name_lower:
+        return "Reconocimiento", reach, True
+    if "whatsapp" in name_lower:
+        return "Whatsapp", wa_count, False
+    if "formulario" in name_lower or "lead" in name_lower:
+        return "Formulario", lead_count, False
+    # objetivo no identificado por el nombre -- usamos el que mas
+    # resultados haya dado como mejor suposicion
+    if lead_count > wa_count:
+        return "Formulario", lead_count, False
+    if wa_count > 0:
+        return "Whatsapp", wa_count, False
+    return "Otro", reach, True
+
+
 def fetch_campaigns_breakdown(account_id, token, since, until):
     """Trae reach/spend/whatsapp/leads POR CAMPAÑA (no agregado a nivel
     cuenta) -- para clientes con muchas campañas de objetivos distintos
@@ -146,23 +166,7 @@ def fetch_campaigns_breakdown(account_id, token, since, until):
             if action_type == "lead":
                 lead_count = int(float(action.get("value", 0)))
 
-        name_lower = name.lower()
-        if "reconocimiento" in name_lower or "awareness" in name_lower:
-            objetivo, resultado, es_awareness = "Reconocimiento", reach, True
-        elif "whatsapp" in name_lower:
-            objetivo, resultado, es_awareness = "Whatsapp", wa_count, False
-        elif "formulario" in name_lower or "lead" in name_lower:
-            objetivo, resultado, es_awareness = "Formulario", lead_count, False
-        else:
-            # objetivo no identificado por el nombre -- usamos el que mas
-            # resultados haya dado como mejor suposicion
-            if lead_count > wa_count:
-                objetivo, resultado, es_awareness = "Formulario", lead_count, False
-            elif wa_count > 0:
-                objetivo, resultado, es_awareness = "Whatsapp", wa_count, False
-            else:
-                objetivo, resultado, es_awareness = "Otro", reach, True
-
+        objetivo, resultado, es_awareness = classify_objective(name, wa_count, lead_count, reach)
         cost_per_result = (spend / resultado) if (resultado and not es_awareness) else None
 
         campaigns.append({
@@ -299,7 +303,7 @@ def fetch_ad_level_metrics(account_id, token, date_preset=None, since=None, unti
     url = f"{GRAPH_API_BASE}/{account_id}/insights"
     params = {
         "level": "ad",
-        "fields": "ad_id,ad_name,reach,spend,actions",
+        "fields": "ad_id,ad_name,campaign_id,campaign_name,reach,spend,actions",
         "limit": 200,
         "access_token": token,
     }
@@ -324,6 +328,142 @@ def fetch_ad_level_metrics(account_id, token, date_preset=None, since=None, unti
         if page > 20:
             break
     return rows
+
+
+def fetch_top_ad_per_campaign(account_id, token, since=None, until=None,
+                               date_preset="last_month", attribution_windows=None,
+                               top_n=1):
+    """Para clientes con muchas campanas de objetivos distintos, arma el
+    top de anuncios POR CAMPAÑA (no un ranking global de toda la cuenta)
+    -- asi cada campana (Seminuevos, Formularios, Reconocimiento, etc.)
+    muestra su propio mejor anuncio, en vez de que una sola campana con
+    mucho presupuesto se lleve todo el ranking general.
+
+    Rankea cada campana por la metrica de SU objetivo (whatsapp si es de
+    whatsapp, leads si es de formulario, alcance si es de reconocimiento).
+    """
+    rows = fetch_ad_level_metrics(
+        account_id, token, date_preset=date_preset, since=since, until=until,
+        attribution_windows=attribution_windows,
+    )
+
+    # Agrupamos por (campana, nombre de anuncio sin sufijo "-Copia") para
+    # sumar duplicados dentro de la MISMA campana, sin mezclar entre
+    # campanas distintas.
+    grouped = {}
+    campaign_totals = {}  # campaign_name -> {reach, spend, wa, leads} acumulado de toda la campana
+    for row in rows:
+        campaign_name = row.get("campaign_name", "Sin campaña")
+        ad_name = row.get("ad_name", "")
+        reach = int(float(row.get("reach", 0)))
+        spend = round(float(row.get("spend", 0)), 2)
+
+        wa_count, lead_count = 0, 0
+        for action in row.get("actions", []):
+            action_type = action.get("action_type", "")
+            if action_type == "onsite_conversion.messaging_conversation_started_7d":
+                wa_count = int(float(action.get("value", 0)))
+            if action_type == "lead":
+                lead_count = int(float(action.get("value", 0)))
+
+        ct = campaign_totals.setdefault(campaign_name, {"reach": 0, "spend": 0.0, "whatsapp": 0, "leads": 0})
+        ct["reach"] += reach
+        ct["spend"] += spend
+        ct["whatsapp"] += wa_count
+        ct["leads"] += lead_count
+
+        normalized_name = re.sub(
+            r"\s*-\s*copia(\s*\d+)?\s*$", "", ad_name, flags=re.IGNORECASE
+        ).strip().lower()
+        key = (campaign_name, normalized_name or ad_name.strip() or row.get("ad_id"))
+
+        if key not in grouped:
+            grouped[key] = {
+                "campaign_name": campaign_name,
+                "name": ad_name,
+                "reach": 0,
+                "spend": 0.0,
+                "whatsapp": 0,
+                "leads": 0,
+                "best_ad_id": row.get("ad_id"),
+                "best_reach": -1,
+            }
+        g = grouped[key]
+        g["reach"] += reach
+        g["spend"] += spend
+        g["whatsapp"] += wa_count
+        g["leads"] += lead_count
+        if reach > g["best_reach"]:
+            g["best_reach"] = reach
+            g["best_ad_id"] = row.get("ad_id")
+
+    # Para cada campana, clasificamos su objetivo (por su nombre) usando
+    # el total acumulado de la campana, y escogemos el/los anuncio(s)
+    # ganador(es) segun esa metrica.
+    winners_by_campaign = {}
+    for campaign_name, totals in campaign_totals.items():
+        objetivo, _, es_awareness = classify_objective(
+            campaign_name, totals["whatsapp"], totals["leads"], totals["reach"]
+        )
+        metric_key = "reach" if es_awareness else ("whatsapp" if objetivo == "Whatsapp" else "leads")
+
+        ads_in_campaign = [dict(a) for a in grouped.values() if a["campaign_name"] == campaign_name]
+        ads_in_campaign.sort(key=lambda a: a[metric_key], reverse=True)
+        top = ads_in_campaign[:top_n]
+        for ad in top:
+            ad["objetivo"] = objetivo
+            ad["metric_key"] = metric_key
+        winners_by_campaign[campaign_name] = top
+
+    # Pedimos el creativo (thumbnail/texto) solo para los anuncios ganadores
+    all_winners = [ad for ads in winners_by_campaign.values() for ad in ads]
+    winner_ids = list({a["best_ad_id"] for a in all_winners if a.get("best_ad_id")})
+    creative_by_id = fetch_ads_creative_info(account_id, token, winner_ids)
+
+    def enrich(ad, prefix, i):
+        info = creative_by_id.get(ad["best_ad_id"], {})
+        creative = info.get("creative", {})
+        image = creative.get("image_url") or creative.get("thumbnail_url", "")
+        video_id = creative.get("object_story_spec", {}).get("video_data", {}).get("video_id")
+        afs = creative.get("asset_feed_spec", {})
+        if not video_id and afs.get("videos"):
+            video_id = afs["videos"][0].get("video_id")
+            if not image:
+                image = afs["videos"][0].get("thumbnail_url") or image
+        if afs.get("images") and (creative.get("object_type") or "").upper() != "VIDEO":
+            image = afs["images"][0].get("url") or image
+        story_id = creative.get("effective_object_story_id")
+
+        manual = load_manual_image(prefix, i)
+        if manual:
+            image = manual
+        elif video_id:
+            better = fetch_video_thumbnail(video_id, token)
+            if better:
+                image = better
+        elif story_id:
+            better = fetch_boosted_post_media(story_id, token)
+            if better:
+                image = better
+
+        ad["name"] = (creative.get("body") or ad["name"])[:90]
+        ad["format"] = (creative.get("object_type") or "ANUNCIO").upper()
+        ad["thumbnail_url"] = image
+        ad["reach"] = f"{ad['reach']:,}"
+        ad["spend"] = f"${ad['spend']:,.2f} MXN"
+        ad["whatsapp"] = f"{ad['whatsapp']:,}"
+        ad["leads"] = f"{ad['leads']:,}"
+        return ad
+
+    result = []
+    i = 1
+    for campaign_name, ads in winners_by_campaign.items():
+        enriched = [enrich(ad, "campaign", i + idx) for idx, ad in enumerate(ads)]
+        i += len(ads)
+        if enriched:
+            result.append({"campaign_name": campaign_name, "ads": enriched})
+
+    return result
 
 
 def fetch_ads_creative_info(account_id, token, ad_ids):
@@ -594,11 +734,14 @@ def main():
         last_freq = range_data["freq"]
         last_wa = range_data["whatsapp"]
         last_leads = range_data["leads"]
-        top_ads = fetch_top_ads(
-            account_id, token,
-            since=kpi_month_start, until=until,
-            attribution_windows=config.get("attribution_windows"),
-        )
+        if not config.get("top_ads_per_campaign"):
+            top_ads = fetch_top_ads(
+                account_id, token,
+                since=kpi_month_start, until=until,
+                attribution_windows=config.get("attribution_windows"),
+            )
+        else:
+            top_ads = None
     else:
         # Default: mes calendario completo (el ultimo mes del rango
         # since->until de las graficas historicas).
@@ -609,11 +752,14 @@ def main():
         last_freq = monthly["freq"][-1] if monthly["freq"] else 0
         last_wa = monthly["whatsapp"][-1] if monthly["whatsapp"] else 0
         last_leads = monthly["leads"][-1] if monthly["leads"] else 0
-        top_ads = fetch_top_ads(
-            account_id, token,
-            date_preset=config.get("top_ads_date_preset", "last_month"),
-            attribution_windows=config.get("attribution_windows"),
-        )
+        if not config.get("top_ads_per_campaign"):
+            top_ads = fetch_top_ads(
+                account_id, token,
+                date_preset=config.get("top_ads_date_preset", "last_month"),
+                attribution_windows=config.get("attribution_windows"),
+            )
+        else:
+            top_ads = None
 
     # IMPORTANTE: el costo por whatsapp/formulario se calcula con el gasto
     # REAL de las campañas que generaron cada resultado -- no con el gasto
@@ -648,6 +794,24 @@ def main():
     if config.get("show_campaign_breakdown"):
         campaigns_breakdown = fetch_campaigns_breakdown(account_id, token, kpi_month_start, until)
 
+    # Top de anuncios POR CAMPAÑA -- alternativa al ranking global, para
+    # cuentas con campañas de objetivos muy distintos (ej. Seminuevos,
+    # Reconocimiento, Refacciones) donde un top 3 general no seria
+    # representativo (siempre ganaria la campaña con mas presupuesto).
+    top_ads_by_campaign = None
+    if config.get("top_ads_per_campaign"):
+        if period_days:
+            top_ads_by_campaign = fetch_top_ad_per_campaign(
+                account_id, token, since=kpi_month_start, until=until,
+                attribution_windows=config.get("attribution_windows"),
+            )
+        else:
+            top_ads_by_campaign = fetch_top_ad_per_campaign(
+                account_id, token,
+                date_preset=config.get("top_ads_date_preset", "last_month"),
+                attribution_windows=config.get("attribution_windows"),
+            )
+
     template_path = Path(__file__).parent / "template.html"
     template = Template(template_path.read_text(encoding="utf-8"))
 
@@ -665,8 +829,9 @@ def main():
         kpi_cost_per_lead=f"${cost_per_lead:,.2f}" if last_leads else "N/A",
         alert_tag=None,
         alert_text=None,
-        top_ads_whatsapp=top_ads["whatsapp"],
-        top_ads_leads=top_ads["leads"],
+        top_ads_whatsapp=(top_ads["whatsapp"] if top_ads else []),
+        top_ads_leads=(top_ads["leads"] if top_ads else []),
+        top_ads_by_campaign=top_ads_by_campaign,
         campaigns_breakdown=campaigns_breakdown,
         insights=insights,
         months_json=json.dumps(monthly["months"]),

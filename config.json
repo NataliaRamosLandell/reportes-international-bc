@@ -6,6 +6,7 @@
   "until": "today",
   "period_label": "2026",
   "show_campaign_breakdown": true,
+  "top_ads_per_campaign": true,
   "output_dir": "docs",
   "output_filename": "international-bc.html"
 }

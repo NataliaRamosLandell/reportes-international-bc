@@ -51,12 +51,12 @@
   .legend span{display:inline-flex;align-items:center;gap:6px;}
   .legend i{width:10px;height:10px;border-radius:2px;display:inline-block;}
   footer{text-align:center;padding:24px;font-size:12px;color:var(--text-muted);}
-  .ad-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:18px;}
-  .ad-card{background:#fff;border:0.5px solid var(--border);border-radius:10px;padding:16px 16px 18px;display:flex;flex-direction:column;}
-  .ad-thumb{width:100%;aspect-ratio:9/12;border-radius:8px;background:#E9ECEF;display:flex;align-items:center;justify-content:center;margin-bottom:12px;position:relative;overflow:hidden;}
+  .ad-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:14px;}
+  .ad-card{background:#fff;border:0.5px solid var(--border);border-radius:10px;padding:10px 10px 12px;display:flex;flex-direction:column;max-width:180px;}
+  .ad-thumb{width:100%;aspect-ratio:9/12;border-radius:8px;background:#E9ECEF;display:flex;align-items:center;justify-content:center;margin-bottom:8px;position:relative;overflow:hidden;}
   .ad-thumb img{width:100%;height:100%;object-fit:cover;}
   .ad-thumb .platform-tag{position:absolute;top:8px;left:8px;background:rgba(19,42,62,0.85);color:#fff;font-size:10px;font-weight:bold;padding:3px 8px;border-radius:20px;letter-spacing:0.3px;}
-  .ad-caption{font-size:12.5px;color:var(--text-dark);line-height:1.5;margin-bottom:12px;min-height:38px;}
+  .ad-caption{font-size:11px;color:var(--text-dark);line-height:1.4;margin-bottom:8px;min-height:30px;}
   .ad-stats{display:flex;gap:8px;flex-wrap:wrap;}
   .ad-stat{background:var(--card);border-radius:6px;padding:6px 10px;flex:1;min-width:80px;}
   .ad-stat .label{font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.3px;}
@@ -172,6 +172,36 @@
     </div>
   </section>
 
+  {% if top_ads_by_campaign %}
+  <section>
+    <h2>Top anuncio por campaña</h2>
+    <p class="caption" style="margin-top:-8px;margin-bottom:16px;">El anuncio con mejor resultado de cada campaña en {{ kpi_period_label }}, rankeado segun el objetivo de esa campaña (whatsapp, formulario o alcance).</p>
+    {% for camp in top_ads_by_campaign %}
+    <h3 style="margin-top:20px;margin-bottom:10px;">{{ camp.campaign_name }}</h3>
+    <div class="ad-grid">
+      {% for ad in camp.ads %}
+      <div class="ad-card">
+        <div class="ad-thumb">
+          <span class="platform-tag">{{ ad.format }}</span>
+          {% if ad.thumbnail_url %}<img src="{{ ad.thumbnail_url }}" alt="Creativo del anuncio">{% endif %}
+        </div>
+        <div class="ad-caption">{{ ad.name }}</div>
+        <div class="ad-stats">
+          {% if ad.objetivo == "Whatsapp" %}
+          <div class="ad-stat highlight"><div class="label">Whatsapps</div><div class="value">{{ ad.whatsapp }}</div></div>
+          {% elif ad.objetivo == "Formulario" %}
+          <div class="ad-stat highlight"><div class="label">Formularios</div><div class="value">{{ ad.leads }}</div></div>
+          {% endif %}
+          <div class="ad-stat"><div class="label">Alcance</div><div class="value">{{ ad.reach }}</div></div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% endfor %}
+  </section>
+  {% endif %}
+
+  {% if top_ads_whatsapp or top_ads_leads %}
   <section>
     <h2>Top anuncios por Whatsapps generados</h2>
     <p class="caption" style="margin-top:-8px;margin-bottom:16px;">Anuncios que mas conversaciones de Whatsapp generaron en {{ kpi_period_label }} (se suman todas las copias del mismo anuncio en distintas campañas).</p>
@@ -213,6 +243,7 @@
       {% if not top_ads_leads %}<p class="caption">No hubo anuncios con formularios en este periodo.</p>{% endif %}
     </div>
   </section>
+  {% endif %}
 
   <section>
     <h2>Insights clave</h2>
