@@ -2,13 +2,11 @@ name: Generar reporte International BC
 
 on:
   schedule:
-    # Se ejecuta automaticamente el dia 1 de cada mes a las 09:00 hora de
-    # Mexico (15:00 UTC). Ajusta la hora si lo prefieres.
     - cron: '0 15 1 * *'
-  workflow_dispatch:  # permite correrlo manualmente desde la pestaña "Actions"
+  workflow_dispatch:
 
 permissions:
-  contents: write  # necesario para que el workflow pueda subir el HTML generado
+  contents: write
 
 jobs:
   generar-reporte:
@@ -26,7 +24,7 @@ jobs:
         run: pip install -r requirements.txt
 
       - name: Generar el dashboard
-       env:
+        env:
           META_ACCESS_TOKEN: ${{ secrets.META_ACCESS_TOKEN }}
           DEBUG_REPORTES: ${{ vars.DEBUG_REPORTES }}
         run: python generar_reporte.py
