@@ -28,8 +28,7 @@ jobs:
       - name: Generar el dashboard
         env:
   META_ACCESS_TOKEN: ${{ secrets.META_ACCESS_TOKEN }}
-  DEBUG_REPORTES: ${{ vars.DEBUG_REPORTES }}
-          META_ACCESS_TOKEN: ${{ secrets.META_ACCESS_TOKEN }}
+          DEBUG_REPORTES: ${{ vars.DEBUG_REPORTES }}
         run: python generar_reporte.py
 
       - name: Publicar el HTML generado
