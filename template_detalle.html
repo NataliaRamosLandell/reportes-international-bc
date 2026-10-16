@@ -82,4 +82,142 @@
         <option value="Sin resultados">Sin resultados</option>
       </select>
     </div>
-    <button
+    <button class="btn-reset" onclick="resetFiltros()">Limpiar filtros</button>
+    <span class="count" id="rowCount"></span>
+  </div>
+
+  <div class="table-wrap">
+    <table id="tablaDetalle">
+      <thead>
+        <tr>
+          <th>Mes</th>
+          <th>Campaña</th>
+          <th>Anuncio</th>
+          <th>Indicador</th>
+          <th class="num">Resultados</th>
+          <th class="num">Costo x resultado</th>
+          <th class="num">Alcance</th>
+          <th class="num">Frecuencia</th>
+          <th class="num">Gasto (MXN)</th>
+          <th class="num">Impresiones</th>
+          <th class="num">CPM (MXN)</th>
+          <th class="num">Clics enlace</th>
+          <th class="num">CPC enlace</th>
+          <th class="num">CTR enlace %</th>
+          <th class="num">Clics totales</th>
+          <th class="num">CTR total %</th>
+          <th class="num">CPC total</th>
+        </tr>
+      </thead>
+      <tbody id="tbody"></tbody>
+    </table>
+    <div class="empty" id="emptyMsg" style="display:none;">No hay filas que coincidan con los filtros.</div>
+  </div>
+</main>
+
+<footer>{{ agency_name }} — generado automaticamente el {{ generated_date }}</footer>
+
+<script>
+const ROWS     = {{ rows_json }};
+const MESES    = {{ meses_json }};
+const CAMPANAS = {{ campanas_json }};
+
+const selMes = document.getElementById('filtroMes');
+MESES.forEach(m => {
+  const o = document.createElement('option');
+  o.value = m.key; o.textContent = m.label;
+  selMes.appendChild(o);
+});
+
+const selCamp = document.getElementById('filtroCampana');
+CAMPANAS.forEach(c => {
+  const o = document.createElement('option');
+  o.value = c; o.textContent = c;
+  selCamp.appendChild(o);
+});
+
+function fmt(n){
+  if(!n) return '<span class="zero">—</span>';
+  return Number(n).toLocaleString('es-MX');
+}
+function fmtMXN(n){
+  if(!n) return '<span class="zero">—</span>';
+  return '$'+Number(n).toLocaleString('es-MX',{minimumFractionDigits:2,maximumFractionDigits:2});
+}
+function fmtPct(n){
+  if(!n) return '<span class="zero">—</span>';
+  return Number(n*100).toLocaleString('es-MX',{minimumFractionDigits:2,maximumFractionDigits:2})+'%';
+}
+function indClass(ind){
+  if(ind.includes('mensajería')) return 'ind-wa';
+  if(ind.includes('formulario')||ind.includes('Lead')) return 'ind-lead';
+  if(ind.includes('página')) return 'ind-lp';
+  return 'ind-none';
+}
+function indShort(ind){
+  if(ind.includes('mensajería')) return 'WhatsApp';
+  if(ind.includes('formulario')||ind.includes('Lead')) return 'Formulario';
+  if(ind.includes('página')) return 'Visita LP';
+  return 'Sin resultados';
+}
+
+function render(){
+  const mes  = document.getElementById('filtroMes').value;
+  const camp = document.getElementById('filtroCampana').value;
+  const ind  = document.getElementById('filtroIndicador').value;
+
+  const filtered = ROWS.filter(r => {
+    if(mes  && r.mes_sort !== mes) return false;
+    if(camp && r.campaña  !== camp) return false;
+    if(ind  && !r.indicador.includes(ind)) return false;
+    return true;
+  });
+
+  document.getElementById('rowCount').textContent = filtered.length.toLocaleString()+' filas';
+  const tbody = document.getElementById('tbody');
+  const empty = document.getElementById('emptyMsg');
+
+  if(filtered.length === 0){
+    tbody.innerHTML = '';
+    empty.style.display = '';
+    return;
+  }
+  empty.style.display = 'none';
+
+  tbody.innerHTML = filtered.map(r => `
+    <tr>
+      <td><span class="mes-tag">${r.mes}</span></td>
+      <td><span class="camp-tag">${r.campaña}</span></td>
+      <td style="max-width:260px;white-space:normal;line-height:1.3;">${r.anuncio}</td>
+      <td class="${indClass(r.indicador)}">${indShort(r.indicador)}</td>
+      <td class="num">${r.resultados > 0 ? fmt(r.resultados) : '<span class="zero">—</span>'}</td>
+      <td class="num">${fmtMXN(r.cpr)}</td>
+      <td class="num">${fmt(r.alcance)}</td>
+      <td class="num">${r.frecuencia > 0 ? Number(r.frecuencia).toLocaleString('es-MX',{minimumFractionDigits:2,maximumFractionDigits:2}) : '<span class="zero">—</span>'}</td>
+      <td class="num">${fmtMXN(r.gasto)}</td>
+      <td class="num">${fmt(r.impresiones)}</td>
+      <td class="num">${fmtMXN(r.cpm)}</td>
+      <td class="num">${fmt(r.clics_enlace)}</td>
+      <td class="num">${fmtMXN(r.cpc_enlace)}</td>
+      <td class="num">${fmtPct(r.ctr_enlace)}</td>
+      <td class="num">${fmt(r.clics_todos)}</td>
+      <td class="num">${fmtPct(r.ctr_todos)}</td>
+      <td class="num">${fmtMXN(r.cpc_todos)}</td>
+    </tr>`).join('');
+}
+
+function resetFiltros(){
+  document.getElementById('filtroMes').value = '';
+  document.getElementById('filtroCampana').value = '';
+  document.getElementById('filtroIndicador').value = '';
+  render();
+}
+
+document.getElementById('filtroMes').addEventListener('change', render);
+document.getElementById('filtroCampana').addEventListener('change', render);
+document.getElementById('filtroIndicador').addEventListener('change', render);
+
+render();
+</script>
+</body>
+</html>
