@@ -1,8 +1,7 @@
 """
-Genera el dashboard de DETALLE por campaña para International BC.
-Muestra leads acumulados, leads mes a mes y CPL mes a mes
-agrupados por proyecto (Unidades Nuevas, Seminuevos, CT, etc.)
-y por canal (Whatsapp / Formulario).
+Genera el dashboard de DETALLE por anuncio para International BC.
+Muestra una tabla con todos los anuncios, mes a mes, con filtros
+interactivos por mes y campaña — igual que el Sheet de Meta Ads.
 
 USO:
     python generar_reporte_detalle.py
@@ -15,9 +14,8 @@ CONFIGURACION:
 import json
 import os
 import sys
-from datetime import datetime, date, timedelta
+from datetime import datetime, date
 from pathlib import Path
-from collections import defaultdict
 
 import requests
 from jinja2 import Template
@@ -25,11 +23,10 @@ from jinja2 import Template
 GRAPH_API_VERSION = "v25.0"
 GRAPH_API_BASE = f"https://graph.facebook.com/{GRAPH_API_VERSION}"
 
-MESES_ES = ["Ene", "Feb", "Mar", "Abr", "May", "Jun",
-            "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"]
-
-MESES_FULL = ["enero", "febrero", "marzo", "abril", "mayo", "junio",
-              "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"]
+MESES_ES = {
+    1:"Ene", 2:"Feb", 3:"Mar", 4:"Abr", 5:"May", 6:"Jun",
+    7:"Jul", 8:"Ago", 9:"Sep", 10:"Oct", 11:"Nov", 12:"Dic"
+}
 
 
 def get_access_token():
@@ -40,48 +37,16 @@ def get_access_token():
     return token
 
 
-def classify_canal(name):
-    """Clasifica el canal de una campaña por palabras clave en su nombre."""
-    name_lower = name.lower()
-    if "reconocimiento" in name_lower or "awareness" in name_lower:
-        return "reconocimiento"
-    if "whatsapp" in name_lower:
-        return "whatsapp"
-    if "formulario" in name_lower or "lead" in name_lower or "llamada" in name_lower:
-        return "formulario"
-    return None  # ignorar campañas sin canal claro (trafico, landing, etc.)
-
-
-def classify_proyecto(name):
-    """
-    Clasifica el proyecto de una campaña.
-    Devuelve una clave corta y un nombre de display.
-    """
-    name_lower = name.lower()
-    if "seminuevo" in name_lower:
-        return "seminuevos", "Seminuevos"
-    if "unidades nuevas" in name_lower or "l13" in name_lower or "lts13" in name_lower:
-        return "unidades_nuevas", "Unidades Nuevas"
-    if "ct" in name_lower and ("whatsapp" in name_lower or "formulario" in name_lower):
-        return "ct", "CT"
-    if "refaccion" in name_lower:
-        return "refacciones", "Refacciones"
-    if "mediano" in name_lower:
-        return "medianos", "Medianos"
-    # Fallback: usar el nombre completo de la campaña sin la palabra de canal
-    return "otro", name
-
-
-def fetch_monthly_by_campaign(account_id, token, since, until):
-    """
-    Trae resultados (whatsapp o leads) y gasto por campaña, desglosado
-    mes a mes usando time_increment=monthly.
-    Devuelve lista de dicts: {campaign_name, month_label, month_num, year, wa, leads, spend}
-    """
+def fetch_ad_insights_monthly(account_id, token, since, until):
     url = f"{GRAPH_API_BASE}/{account_id}/insights"
     params = {
-        "level": "campaign",
-        "fields": "campaign_name,spend,actions",
+        "level": "ad",
+        "fields": (
+            "ad_name,campaign_name,adset_name,"
+            "reach,impressions,frequency,spend,actions,"
+            "cost_per_action_type,cpm,cpc,ctr,"
+            "inline_link_clicks,website_ctr"
+        ),
         "time_increment": "monthly",
         "time_range": json.dumps({"since": since, "until": until}),
         "limit": 500,
@@ -92,189 +57,104 @@ def fetch_monthly_by_campaign(account_id, token, since, until):
     next_url, next_params = url, params
     page = 1
     while next_url:
-        resp = requests.get(next_url, params=next_params, timeout=30)
+        resp = requests.get(next_url, params=next_params, timeout=60)
         resp.raise_for_status()
         payload = resp.json()
         rows.extend(payload.get("data", []))
         next_url = payload.get("paging", {}).get("next")
         next_params = None
         page += 1
-        if page > 20:
+        if page > 50:
             break
 
-    result = []
+    print(f"  {len(rows)} filas brutas obtenidas de la API.")
+    return rows
+
+
+def parse_rows(rows):
+    parsed = []
     for row in rows:
-        name = row.get("campaign_name", "")
-        spend = round(float(row.get("spend", 0)), 2)
         date_start = row.get("date_start", "")
         if not date_start:
             continue
         dt = datetime.strptime(date_start, "%Y-%m-%d")
-        month_num = dt.month
-        year = dt.year
-        month_label = f"{MESES_ES[month_num - 1]} {str(year)[-2:]}"
+        mes_label = f"{MESES_ES[dt.month]} {dt.year}"
 
-        wa_count, lead_count = 0, 0
-        for action in row.get("actions", []):
-            atype = action.get("action_type", "")
+        ad_name       = row.get("ad_name", "")
+        campaign_name = row.get("campaign_name", "")
+        adset_name    = row.get("adset_name", "")
+        reach         = int(float(row.get("reach", 0)))
+        impressions   = int(float(row.get("impressions", 0)))
+        spend         = round(float(row.get("spend", 0)), 2)
+        freq          = round(float(row.get("frequency", 0) or 0), 2)
+        cpm           = round(float(row.get("cpm", 0) or 0), 2)
+        ctr_all       = round(float(row.get("ctr", 0) or 0), 6)
+        cpc_all       = round(float(row.get("cpc", 0) or 0), 2)
+        inline_clicks = int(float(row.get("inline_link_clicks", 0) or 0))
+        inline_ctr    = round(float((row.get("website_ctr") or [{}])[0].get("value", 0) or 0), 6) if row.get("website_ctr") else 0
+        inline_cpc    = round(spend / inline_clicks, 2) if inline_clicks else 0
+
+        actions  = row.get("actions", [])
+        cost_per = row.get("cost_per_action_type", [])
+
+        wa_count   = 0
+        lead_count = 0
+        lp_count   = 0
+
+        for a in actions:
+            atype = a.get("action_type", "")
+            val   = int(float(a.get("value", 0)))
             if atype == "onsite_conversion.messaging_conversation_started_7d":
-                wa_count = int(float(action.get("value", 0)))
-            if atype == "lead":
-                lead_count = int(float(action.get("value", 0)))
+                wa_count = val
+            elif atype == "lead":
+                lead_count = val
+            elif atype == "landing_page_view":
+                lp_count = val
 
-        canal = classify_canal(name)
-        if canal is None or canal == "reconocimiento":
-            continue  # excluir campañas de alcance/awareness/landing
-
-        proyecto_key, proyecto_display = classify_proyecto(name)
-
-        result.append({
-            "campaign_name": name,
-            "proyecto_key": proyecto_key,
-            "proyecto_display": proyecto_display,
-            "canal": canal,
-            "month_num": month_num,
-            "year": year,
-            "month_label": month_label,
-            "wa": wa_count,
-            "leads": lead_count,
-            "spend": spend,
-        })
-
-    return result
-
-
-def build_months_range(since, until):
-    """Genera la lista ordenada de meses entre since y until."""
-    since_dt = datetime.strptime(since, "%Y-%m-%d")
-    until_dt = datetime.strptime(until, "%Y-%m-%d")
-    months = []
-    current = since_dt.replace(day=1)
-    while current <= until_dt.replace(day=1):
-        months.append({
-            "key": f"{current.year}-{current.month:02d}",
-            "label": f"{MESES_ES[current.month - 1]} {str(current.year)[-2:]}",
-            "month_num": current.month,
-            "year": current.year,
-        })
-        # avanzar al mes siguiente
-        if current.month == 12:
-            current = current.replace(year=current.year + 1, month=1)
+        if wa_count > 0:
+            resultado = wa_count
+            indicador = "Conversaciones de mensajería iniciadas"
+            cpr_raw   = next((float(c.get("value", 0)) for c in cost_per
+                              if c.get("action_type") == "onsite_conversion.messaging_conversation_started_7d"), 0)
+        elif lead_count > 0:
+            resultado = lead_count
+            indicador = "Leads (formulario)"
+            cpr_raw   = next((float(c.get("value", 0)) for c in cost_per
+                              if c.get("action_type") == "lead"), 0)
+        elif lp_count > 0:
+            resultado = lp_count
+            indicador = "Visitas a página de destino"
+            cpr_raw   = round(spend / lp_count, 2) if lp_count else 0
         else:
-            current = current.replace(month=current.month + 1)
-    return months
+            resultado = 0
+            indicador = "Sin resultados registrados"
+            cpr_raw   = 0
 
-
-def build_tables(rows, months):
-    """
-    A partir de las filas de datos construye las 3 estructuras de tabla:
-
-    1. tabla_acumulados: por proyecto+canal, columnas = meses + total
-    2. tabla_leads_canal: por canal (WA/Form), columnas = meses + total
-    3. tabla_cpl: por proyecto+canal, columnas = meses (CPL)
-    """
-
-    # ── índice base: (proyecto_key, canal) -> {month_key -> {wa, leads, spend}}
-    idx = defaultdict(lambda: defaultdict(lambda: {"wa": 0, "leads": 0, "spend": 0.0}))
-    proyecto_display_map = {}
-
-    for row in rows:
-        pk = row["proyecto_key"]
-        canal = row["canal"]
-        mkey = f"{row['year']}-{row['month_num']:02d}"
-        idx[(pk, canal)][mkey]["wa"] += row["wa"]
-        idx[(pk, canal)][mkey]["leads"] += row["leads"]
-        idx[(pk, canal)][mkey]["spend"] += row["spend"]
-        proyecto_display_map[pk] = row["proyecto_display"]
-
-    month_keys = [m["key"] for m in months]
-
-    def results(cell, canal):
-        return cell["wa"] if canal == "whatsapp" else cell["leads"]
-
-    def cpl(cell, canal):
-        r = results(cell, canal)
-        return round(cell["spend"] / r, 2) if r > 0 else None
-
-    # ── TABLA 1: acumulados por proyecto+canal
-    tabla_acumulados = []
-    for (pk, canal), months_data in sorted(idx.items()):
-        display = proyecto_display_map.get(pk, pk)
-        row_data = []
-        total = 0
-        for mkey in month_keys:
-            cell = months_data.get(mkey, {"wa": 0, "leads": 0, "spend": 0.0})
-            val = results(cell, canal)
-            row_data.append(val if val > 0 else None)
-            total += val
-        tabla_acumulados.append({
-            "proyecto": display,
-            "canal": canal,
-            "meses": row_data,
-            "total": total,
+        parsed.append({
+            "mes":          mes_label,
+            "mes_sort":     date_start[:7],
+            "campaña":      campaign_name,
+            "conjunto":     adset_name,
+            "anuncio":      ad_name,
+            "resultados":   resultado,
+            "indicador":    indicador,
+            "alcance":      reach,
+            "frecuencia":   freq,
+            "cpr":          round(cpr_raw, 2),
+            "gasto":        spend,
+            "impresiones":  impressions,
+            "cpm":          cpm,
+            "clics_enlace": inline_clicks,
+            "cpc_enlace":   inline_cpc,
+            "ctr_enlace":   inline_ctr,
+            "clics_todos":  int(float(row.get("clicks", 0) or 0)),
+            "ctr_todos":    ctr_all,
+            "cpc_todos":    cpc_all,
         })
 
-    # ordenar: por proyecto alfabético, luego canal
-    tabla_acumulados.sort(key=lambda r: (r["proyecto"], r["canal"]))
-
-    # subtotales y total general
-    subtotales = {}
-    for row in tabla_acumulados:
-        pk = row["proyecto"]
-        if pk not in subtotales:
-            subtotales[pk] = [0] * len(month_keys)
-        for i, v in enumerate(row["meses"]):
-            subtotales[pk][i] += v or 0
-
-    total_general = [0] * len(month_keys)
-    for vals in subtotales.values():
-        for i, v in enumerate(vals):
-            total_general[i] += v
-
-    # ── TABLA 2: leads por canal mes a mes
-    canal_totals = defaultdict(lambda: defaultdict(int))
-    for (pk, canal), months_data in idx.items():
-        for mkey, cell in months_data.items():
-            canal_totals[canal][mkey] += results(cell, canal)
-
-    tabla_canal = []
-    for canal in ["whatsapp", "formulario"]:
-        row_data = [canal_totals[canal].get(mkey, 0) or None for mkey in month_keys]
-        total = sum(v or 0 for v in row_data)
-        tabla_canal.append({
-            "canal": canal,
-            "meses": row_data,
-            "total": total,
-        })
-    total_canal = [
-        sum((tabla_canal[i]["meses"][j] or 0) for i in range(len(tabla_canal)))
-        for j in range(len(month_keys))
-    ]
-
-    # ── TABLA 3: CPL por proyecto+canal
-    tabla_cpl = []
-    for (pk, canal), months_data in sorted(idx.items()):
-        display = proyecto_display_map.get(pk, pk)
-        row_data = []
-        for mkey in month_keys:
-            cell = months_data.get(mkey, {"wa": 0, "leads": 0, "spend": 0.0})
-            row_data.append(cpl(cell, canal))
-        tabla_cpl.append({
-            "proyecto": display,
-            "canal": canal,
-            "meses": row_data,
-        })
-    tabla_cpl.sort(key=lambda r: (r["proyecto"], r["canal"]))
-
-    return {
-        "meses": months,
-        "tabla_acumulados": tabla_acumulados,
-        "subtotales": subtotales,
-        "total_general": total_general,
-        "tabla_canal": tabla_canal,
-        "total_canal": total_canal,
-        "tabla_cpl": tabla_cpl,
-    }
+    parsed.sort(key=lambda r: (r["mes_sort"], r["campaña"], r["anuncio"]), reverse=False)
+    parsed.sort(key=lambda r: r["mes_sort"], reverse=True)
+    return parsed
 
 
 def main():
@@ -284,33 +164,37 @@ def main():
         sys.exit(1)
     config = json.loads(config_path.read_text(encoding="utf-8"))
 
-    token = get_access_token()
+    token      = get_access_token()
     account_id = config["account_id"]
-    since = config["since"]
-    until = config["until"]
+    since      = config["since"]
+    until      = config["until"]
     if str(until).strip().lower() == "today":
         until = date.today().strftime("%Y-%m-%d")
 
     print(f"Jalando datos detalle de {account_id} ({since} → {until})...")
-    rows = fetch_monthly_by_campaign(account_id, token, since, until)
-    print(f"  {len(rows)} filas de datos obtenidas.")
+    raw_rows = fetch_ad_insights_monthly(account_id, token, since, until)
+    rows     = parse_rows(raw_rows)
+    print(f"  {len(rows)} filas procesadas.")
 
-    months = build_months_range(since, until)
-    tables = build_tables(rows, months)
+    meses        = sorted(set(r["mes_sort"] for r in rows), reverse=True)
+    meses_labels = {r["mes_sort"]: r["mes"] for r in rows}
+    campanas     = sorted(set(r["campaña"] for r in rows))
 
     template_path = Path(__file__).parent / "template_detalle.html"
-    template = Template(template_path.read_text(encoding="utf-8"))
+    template      = Template(template_path.read_text(encoding="utf-8"))
 
     html = template.render(
-        agency_name=config.get("agency_name", "Quattro Marketing"),
-        client_name=config["client_name"],
-        period_label=config.get("period_label", "2026"),
-        generated_date=date.today().strftime("%d/%m/%Y"),
-        until_label=datetime.strptime(until, "%Y-%m-%d").strftime("%d/%m/%Y"),
-        **tables,
+        agency_name    = config.get("agency_name", "Quattro Marketing"),
+        client_name    = config["client_name"],
+        period_label   = config.get("period_label", "2026"),
+        generated_date = date.today().strftime("%d/%m/%Y"),
+        until_label    = datetime.strptime(until, "%Y-%m-%d").strftime("%d/%m/%Y"),
+        rows_json      = json.dumps(rows, ensure_ascii=False),
+        meses_json     = json.dumps([{"key": m, "label": meses_labels[m]} for m in meses], ensure_ascii=False),
+        campanas_json  = json.dumps(campanas, ensure_ascii=False),
     )
 
-    output_dir = Path(__file__).parent / config.get("output_dir", "docs")
+    output_dir  = Path(__file__).parent / config.get("output_dir", "docs")
     output_dir.mkdir(exist_ok=True, parents=True)
     output_file = output_dir / config.get("output_filename", "international-bc-detalle.html")
     output_file.write_text(html, encoding="utf-8")
