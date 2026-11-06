@@ -52,6 +52,6 @@ def graph_get_all(url, params, max_pages=20):
     rows = []
     next_url, next_params = url, params
     page = 1
-     while next_url:
+    while next_url:
         resp = requests.get(next_url, params=next_params, timeout=60)
         if not resp.ok:
