@@ -1,7 +1,7 @@
 {
   "agency_name": "Quattro Marketing",
   "client_name": "International de Baja California",
-  "account_id": "act_1043787234524197",
+  "account_ids": ["act_1043787234524197", "act_2161870551370059"],
   "since": "2026-01-01",
   "until": "today",
   "period_label": "2026",
