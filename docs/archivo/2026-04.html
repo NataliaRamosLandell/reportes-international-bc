@@ -74,6 +74,7 @@
   .obj-badge.formulario{background:#FDECEA;color:#E15241;}
   .obj-badge.reconocimiento{background:#E8ECF0;color:#132A3E;}
   .obj-badge.otro{background:#F1F3F5;color:var(--text-muted);}
+  .obj-badge.llamadas{background:#FDF3D7;color:#B07A00;}
   @media (max-width:800px){.two-col,.split{grid-template-columns:1fr;}header{padding:32px 20px;}main{padding:24px 20px 40px;}}
 </style>
 </head>
@@ -95,13 +96,15 @@
     <div class="kpi-grid">
       <div class="kpi-card"><div class="label">Alcance</div><div class="value">493,115</div></div>
       <div class="kpi-card"><div class="label">Costo</div><div class="value">$45,426.59 MXN</div></div>
-      <div class="kpi-card"><div class="label">Whatsapps</div><div class="value">965</div></div>
-      <div class="kpi-card"><div class="label">Formularios</div><div class="value">79</div></div>
-      <div class="kpi-card"><div class="label">Costo x Whatsapp</div><div class="value">$36.48</div></div>
-      <div class="kpi-card"><div class="label">Costo x Formulario</div><div class="value">$97.12</div></div>
+      <div class="kpi-card"><div class="label">Whatsapps</div><div class="value">915</div></div>
+      <div class="kpi-card"><div class="label">Formularios</div><div class="value">78</div></div>
+      
+      <div class="kpi-card"><div class="label">Costo x Whatsapp</div><div class="value">$28.00</div></div>
+      <div class="kpi-card"><div class="label">Costo x Formulario</div><div class="value">$160.67</div></div>
+      
       <div class="kpi-card"><div class="label">Frecuencia prom.</div><div class="value">5.0</div></div>
     </div>
-    <p class="caption">Costo x Whatsapp y x Formulario calculados con el gasto de las campañas de cada objetivo, no con el gasto total de la cuenta.</p>
+    <p class="caption">Los costos por resultado se calculan con el gasto de las campañas de cada objetivo (whatsapp, formulario o llamada), no con el gasto total de la cuenta.</p>
   </section>
 
   
@@ -223,10 +226,11 @@
         <div class="chart-wrap" style="height:280px;"><canvas id="costFreqChart"></canvas></div>
       </div>
       <div class="chart-card">
-        <h3>Whatsapps vs formularios</h3>
+        <h3>Whatsapps, formularios y llamadas</h3>
         <div class="legend">
           <span><i style="background:#132A3E"></i>Whatsapps</span>
           <span><i style="background:#E15241"></i>Formularios</span>
+          <span><i style="background:#EDA100"></i>Llamadas</span>
         </div>
         <div class="chart-wrap" style="height:280px;"><canvas id="leadsChart"></canvas></div>
       </div>
@@ -628,11 +632,11 @@ En International, seguimos creciendo para mantener tu operación</div>
         
         <li>El alcance subió 86.8% respecto al periodo anterior (263,996 → 493,115).</li>
         
-        <li>Los resultados totales (whatsapp + formularios) aumentaron 140.0% respecto al periodo anterior (435 → 1044).</li>
+        <li>Los resultados totales (whatsapp + formularios + llamadas) aumentaron 87.0% respecto al periodo anterior (531 → 993).</li>
         
-        <li>El costo promedio por resultado (whatsapp o formulario) fue de $43.51 MXN, 53.5% más barato que el periodo anterior ($93.54 MXN).</li>
+        <li>El costo promedio por resultado (whatsapp, formulario o llamada) fue de $45.75 MXN, 40.3% más barato que el periodo anterior ($76.63 MXN).</li>
         
-        <li>92% de los resultados vinieron de Whatsapp y 8% de formularios -- el canal dominante este periodo fue Whatsapp.</li>
+        <li>Los resultados se repartieron así: 92% de Whatsapp, 8% de formularios. El canal dominante este periodo fue Whatsapp.</li>
         
       </ul>
     </div>
@@ -645,7 +649,7 @@ En International, seguimos creciendo para mantener tu operación</div>
   <a href="index.html" style="color:var(--red);font-size:13px;text-decoration:none;">Ver reportes de meses anteriores →</a>
 </div>
 
-<footer>Quattro Marketing — generado automaticamente el 06/11/2026</footer>
+<footer>Quattro Marketing — generado automaticamente el 07/11/2026</footer>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <script>
@@ -658,8 +662,9 @@ const RED = '#E15241';
 const reach = [270425, 156750, 268821, 493115];
 const cost = [37839.3, 37496.56, 42389.23, 45426.59];
 const freq = [4.7, 6.8, 5.1, 5.0];
-const wa = [427, 248, 358, 965];
-const form = [108, 130, 93, 79];
+const wa = [353, 163, 298, 915];
+const form = [107, 130, 93, 78];
+const calls = [60, 204, 167, 0];
 
 Chart.defaults.font.family = "Calibri, 'Segoe UI', Arial, sans-serif";
 
@@ -684,7 +689,7 @@ new Chart(document.getElementById('leadsChart'), {
   data:{ labels:months, datasets:[
     {label:'Whatsapps',data:wa,backgroundColor:NAVY,borderRadius:4},
     {label:'Formularios',data:form,backgroundColor:RED,borderRadius:4}
-  ]},
+  ].concat(calls.some(v=>v>0) ? [{label:'Llamadas',data:calls,backgroundColor:'#EDA100',borderRadius:4}] : [])},
   options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}},
     scales:{ y:{grid:{color:grid},ticks:{color:muted}}, x:{grid:{display:false},ticks:{color:muted}} } }
 });

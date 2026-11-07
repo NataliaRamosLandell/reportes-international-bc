@@ -74,6 +74,7 @@
   .obj-badge.formulario{background:#FDECEA;color:#E15241;}
   .obj-badge.reconocimiento{background:#E8ECF0;color:#132A3E;}
   .obj-badge.otro{background:#F1F3F5;color:var(--text-muted);}
+  .obj-badge.llamadas{background:#FDF3D7;color:#B07A00;}
   @media (max-width:800px){.two-col,.split{grid-template-columns:1fr;}header{padding:32px 20px;}main{padding:24px 20px 40px;}}
 </style>
 </head>
@@ -95,13 +96,15 @@
     <div class="kpi-grid">
       <div class="kpi-card"><div class="label">Alcance</div><div class="value">270,425</div></div>
       <div class="kpi-card"><div class="label">Costo</div><div class="value">$37,839.30 MXN</div></div>
-      <div class="kpi-card"><div class="label">Whatsapps</div><div class="value">427</div></div>
-      <div class="kpi-card"><div class="label">Formularios</div><div class="value">108</div></div>
-      <div class="kpi-card"><div class="label">Costo x Whatsapp</div><div class="value">$65.93</div></div>
-      <div class="kpi-card"><div class="label">Costo x Formulario</div><div class="value">$89.69</div></div>
+      <div class="kpi-card"><div class="label">Whatsapps</div><div class="value">353</div></div>
+      <div class="kpi-card"><div class="label">Formularios</div><div class="value">107</div></div>
+      <div class="kpi-card"><div class="label">Llamadas</div><div class="value">60</div></div>
+      <div class="kpi-card"><div class="label">Costo x Whatsapp</div><div class="value">$54.51</div></div>
+      <div class="kpi-card"><div class="label">Costo x Formulario</div><div class="value">$143.65</div></div>
+      <div class="kpi-card"><div class="label">Costo x Llamada</div><div class="value">$53.78</div></div>
       <div class="kpi-card"><div class="label">Frecuencia prom.</div><div class="value">4.7</div></div>
     </div>
-    <p class="caption">Costo x Whatsapp y x Formulario calculados con el gasto de las campañas de cada objetivo, no con el gasto total de la cuenta.</p>
+    <p class="caption">Los costos por resultado se calculan con el gasto de las campañas de cada objetivo (whatsapp, formulario o llamada), no con el gasto total de la cuenta.</p>
   </section>
 
   
@@ -171,11 +174,11 @@
           
           <tr>
             <td>Llamadas / Refacciones / 2026</td>
-            <td><span class="obj-badge whatsapp">Whatsapp</span></td>
+            <td><span class="obj-badge llamadas">Llamadas</span></td>
             <td>68,007</td>
             <td>$3,227.08 MXN</td>
-            <td>1</td>
-            <td>$3,227.08</td>
+            <td>60</td>
+            <td>$53.78</td>
           </tr>
           
           <tr>
@@ -223,10 +226,11 @@
         <div class="chart-wrap" style="height:280px;"><canvas id="costFreqChart"></canvas></div>
       </div>
       <div class="chart-card">
-        <h3>Whatsapps vs formularios</h3>
+        <h3>Whatsapps, formularios y llamadas</h3>
         <div class="legend">
           <span><i style="background:#132A3E"></i>Whatsapps</span>
           <span><i style="background:#E15241"></i>Formularios</span>
+          <span><i style="background:#EDA100"></i>Llamadas</span>
         </div>
         <div class="chart-wrap" style="height:280px;"><canvas id="leadsChart"></canvas></div>
       </div>
@@ -575,12 +579,26 @@ Con el motor CUMMINS B6.7 y certifica</div>
       <div class="ad-card">
         <div class="ad-thumb">
           <span class="platform-tag">SHARE</span>
+          <img src="data:image/jpeg;base64,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" alt="Creativo del anuncio">
+        </div>
+        <div class="ad-caption">2 ACUMULADOR FLEETRITE FLRT31T925HP - Copia 2</div>
+        <div class="ad-stats">
+          
+          <div class="ad-stat highlight"><div class="label">Llamadas</div><div class="value">39</div></div>
+          
+          <div class="ad-stat"><div class="label">Alcance</div><div class="value">61,896</div></div>
+        </div>
+      </div>
+      
+      <div class="ad-card">
+        <div class="ad-thumb">
+          <span class="platform-tag">SHARE</span>
           <img src="data:image/jpeg;base64,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" alt="Creativo del anuncio">
         </div>
         <div class="ad-caption">aceite sintetico diferencial 80W140</div>
         <div class="ad-stats">
           
-          <div class="ad-stat highlight"><div class="label">Whatsapps</div><div class="value">1</div></div>
+          <div class="ad-stat highlight"><div class="label">Llamadas</div><div class="value">8</div></div>
           
           <div class="ad-stat"><div class="label">Alcance</div><div class="value">9,234</div></div>
         </div>
@@ -594,23 +612,9 @@ Con el motor CUMMINS B6.7 y certifica</div>
         <div class="ad-caption">ACUMULADOR FLEETRITE FLRT31T925HP</div>
         <div class="ad-stats">
           
-          <div class="ad-stat highlight"><div class="label">Whatsapps</div><div class="value">0</div></div>
+          <div class="ad-stat highlight"><div class="label">Llamadas</div><div class="value">6</div></div>
           
           <div class="ad-stat"><div class="label">Alcance</div><div class="value">11,934</div></div>
-        </div>
-      </div>
-      
-      <div class="ad-card">
-        <div class="ad-thumb">
-          <span class="platform-tag">SHARE</span>
-          <img src="data:image/jpeg;base64,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" alt="Creativo del anuncio">
-        </div>
-        <div class="ad-caption">ACEITE MOTOR INTERNATIONAL 15W-40 CK-4 |</div>
-        <div class="ad-stats">
-          
-          <div class="ad-stat highlight"><div class="label">Whatsapps</div><div class="value">0</div></div>
-          
-          <div class="ad-stat"><div class="label">Alcance</div><div class="value">6,272</div></div>
         </div>
       </div>
       
@@ -629,11 +633,11 @@ Con el motor CUMMINS B6.7 y certifica</div>
         
         <li>El alcance cayó 34.6% respecto al periodo anterior (413,288 → 270,425).</li>
         
-        <li>Los resultados totales (whatsapp + formularios) aumentaron 26.8% respecto al periodo anterior (422 → 535).</li>
+        <li>Los resultados totales (whatsapp + formularios + llamadas) aumentaron 33.3% respecto al periodo anterior (390 → 520).</li>
         
-        <li>El costo promedio por resultado (whatsapp o formulario) fue de $70.73 MXN, 14.0% más barato que el periodo anterior ($82.26 MXN).</li>
+        <li>El costo promedio por resultado (whatsapp, formulario o llamada) fue de $72.77 MXN, 18.2% más barato que el periodo anterior ($89.01 MXN).</li>
         
-        <li>80% de los resultados vinieron de Whatsapp y 20% de formularios -- el canal dominante este periodo fue Whatsapp.</li>
+        <li>Los resultados se repartieron así: 68% de Whatsapp, 21% de formularios, 12% de llamadas. El canal dominante este periodo fue Whatsapp.</li>
         
       </ul>
     </div>
@@ -659,8 +663,9 @@ const RED = '#E15241';
 const reach = [270425];
 const cost = [37839.3];
 const freq = [4.7];
-const wa = [427];
-const form = [108];
+const wa = [353];
+const form = [107];
+const calls = [60];
 
 Chart.defaults.font.family = "Calibri, 'Segoe UI', Arial, sans-serif";
 
@@ -685,7 +690,7 @@ new Chart(document.getElementById('leadsChart'), {
   data:{ labels:months, datasets:[
     {label:'Whatsapps',data:wa,backgroundColor:NAVY,borderRadius:4},
     {label:'Formularios',data:form,backgroundColor:RED,borderRadius:4}
-  ]},
+  ].concat(calls.some(v=>v>0) ? [{label:'Llamadas',data:calls,backgroundColor:'#EDA100',borderRadius:4}] : [])},
   options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}},
     scales:{ y:{grid:{color:grid},ticks:{color:muted}}, x:{grid:{display:false},ticks:{color:muted}} } }
 });
