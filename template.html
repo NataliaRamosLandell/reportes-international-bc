@@ -91,20 +91,20 @@
 <main>
 
   <section>
-    <h2>Resumen ejecutivo</h2>
-    <p class="caption" style="margin-top:-10px;">Datos de {{ kpi_period_label }}.</p>
+    <h2>Resumen ejecutivo semanal</h2>
+    <p class="caption" style="margin-top:-10px;">Resultados de la semana del {{ kpi_period_label }} (lunes a domingo).</p>
     <div class="kpi-grid">
-      <div class="kpi-card"><div class="label">Alcance</div><div class="value">{{ kpi_reach }}</div></div>
-      <div class="kpi-card"><div class="label">Costo</div><div class="value">{{ kpi_spend }}</div></div>
-      <div class="kpi-card"><div class="label">Whatsapps</div><div class="value">{{ kpi_whatsapp }}</div></div>
-      <div class="kpi-card"><div class="label">Formularios</div><div class="value">{{ kpi_leads }}</div></div>
-      {% if show_calls %}<div class="kpi-card"><div class="label">Llamadas</div><div class="value">{{ kpi_calls }}</div></div>{% endif %}
+      <div class="kpi-card"><div class="label">Alcance semanal</div><div class="value">{{ kpi_reach }}</div></div>
+      <div class="kpi-card"><div class="label">Costo semanal</div><div class="value">{{ kpi_spend }}</div></div>
+      <div class="kpi-card"><div class="label">Whatsapps de la semana</div><div class="value">{{ kpi_whatsapp }}</div></div>
+      <div class="kpi-card"><div class="label">Formularios de la semana</div><div class="value">{{ kpi_leads }}</div></div>
+      {% if show_calls %}<div class="kpi-card"><div class="label">Llamadas de la semana</div><div class="value">{{ kpi_calls }}</div></div>{% endif %}
       <div class="kpi-card"><div class="label">Costo x Whatsapp</div><div class="value">{{ kpi_cost_per_wa }}</div></div>
       <div class="kpi-card"><div class="label">Costo x Formulario</div><div class="value">{{ kpi_cost_per_lead }}</div></div>
       {% if show_calls %}<div class="kpi-card"><div class="label">Costo x Llamada</div><div class="value">{{ kpi_cost_per_call }}</div></div>{% endif %}
-      <div class="kpi-card"><div class="label">Frecuencia prom.</div><div class="value">{{ kpi_frequency }}</div></div>
+      <div class="kpi-card"><div class="label">Frecuencia semanal</div><div class="value">{{ kpi_frequency }}</div></div>
     </div>
-    <p class="caption">Los costos por resultado se calculan con el gasto de las campañas de cada objetivo (whatsapp, formulario o llamada), no con el gasto total de la cuenta.</p>
+    <p class="caption">Los costos por resultado se calculan con el gasto de las campañas de cada objetivo (whatsapp, formulario o llamada), no con el gasto total de la cuenta. Este resumen se actualiza cada lunes con la semana que acaba de terminar; las graficas de abajo se muestran por mes.</p>
   </section>
 
   {% if alert_text %}
@@ -116,8 +116,8 @@
 
   {% if campaigns_breakdown %}
   <section>
-    <h2>Resultados por campaña</h2>
-    <p class="caption" style="margin-top:-8px;margin-bottom:16px;">KPI individual de cada campaña en {{ kpi_period_label }}, ordenadas por gasto.</p>
+    <h2>Resultados por campaña de la semana</h2>
+    <p class="caption" style="margin-top:-8px;margin-bottom:16px;">KPI individual de cada campaña en la semana del {{ kpi_period_label }}, ordenadas por gasto.</p>
     <div class="chart-card" style="overflow-x:auto;">
       <table class="campaign-table">
         <thead>
@@ -151,38 +151,29 @@
     <h2>Historico {{ period_label }}</h2>
     <div class="chart-card">
       <h3>Alcance mensual (personas)</h3>
+      <p class="caption" style="margin-top:-6px;margin-bottom:10px;">Las graficas son mensuales; el mes en curso va sumando conforme avanza.</p>
       <div class="legend"><span><i style="background:#E15241"></i>Alcance</span></div>
       <div class="chart-wrap" style="height:280px;"><canvas id="reachChart"></canvas></div>
     </div>
   </section>
 
   <section>
-    <h2>Inversion y generacion de leads</h2>
-    <div class="two-col">
-      <div class="chart-card">
-        <h3>Costo total vs frecuencia</h3>
-        <div class="legend">
-          <span><i style="background:#132A3E"></i>Costo (MXN)</span>
-          <span><i style="background:#E15241"></i>Frecuencia</span>
-        </div>
-        <div class="chart-wrap" style="height:280px;"><canvas id="costFreqChart"></canvas></div>
+    <h2>Generacion de leads mensual</h2>
+    <div class="chart-card">
+      <h3>Whatsapps, formularios y llamadas por mes</h3>
+      <div class="legend">
+        <span><i style="background:#132A3E"></i>Whatsapps</span>
+        <span><i style="background:#E15241"></i>Formularios</span>
+        {% if show_calls_chart %}<span><i style="background:#EDA100"></i>Llamadas</span>{% endif %}
       </div>
-      <div class="chart-card">
-        <h3>Whatsapps, formularios y llamadas</h3>
-        <div class="legend">
-          <span><i style="background:#132A3E"></i>Whatsapps</span>
-          <span><i style="background:#E15241"></i>Formularios</span>
-          {% if show_calls_chart %}<span><i style="background:#EDA100"></i>Llamadas</span>{% endif %}
-        </div>
-        <div class="chart-wrap" style="height:280px;"><canvas id="leadsChart"></canvas></div>
-      </div>
+      <div class="chart-wrap" style="height:280px;"><canvas id="leadsChart"></canvas></div>
     </div>
   </section>
 
   {% if top_ads_by_campaign %}
   <section>
-    <h2>Top anuncio por campaña</h2>
-    <p class="caption" style="margin-top:-8px;margin-bottom:16px;">El anuncio con mejor resultado de cada campaña en {{ kpi_period_label }}, rankeado segun el objetivo de esa campaña (whatsapp, formulario o alcance).</p>
+    <h2>Top anuncios por campaña de la semana</h2>
+    <p class="caption" style="margin-top:-8px;margin-bottom:16px;">Los anuncios con mejor resultado de cada campaña en la semana del {{ kpi_period_label }}, rankeado segun el objetivo de esa campaña (whatsapp, formulario o alcance).</p>
     {% for camp in top_ads_by_campaign %}
     <h3 style="margin-top:20px;margin-bottom:10px;">{{ camp.campaign_name }}</h3>
     <div class="ad-grid">
@@ -213,7 +204,7 @@
   {% if top_ads_whatsapp or top_ads_leads %}
   <section>
     <h2>Top anuncios por Whatsapps generados</h2>
-    <p class="caption" style="margin-top:-8px;margin-bottom:16px;">Anuncios que mas conversaciones de Whatsapp generaron en {{ kpi_period_label }} (se suman todas las copias del mismo anuncio en distintas campañas).</p>
+    <p class="caption" style="margin-top:-8px;margin-bottom:16px;">Anuncios que mas conversaciones de Whatsapp generaron en la semana del {{ kpi_period_label }} (se suman todas las copias del mismo anuncio en distintas campañas).</p>
     <div class="ad-grid">
       {% for ad in top_ads_whatsapp %}
       <div class="ad-card">
@@ -228,13 +219,13 @@
         </div>
       </div>
       {% endfor %}
-      {% if not top_ads_whatsapp %}<p class="caption">No hubo anuncios con conversaciones de Whatsapp en este periodo.</p>{% endif %}
+      {% if not top_ads_whatsapp %}<p class="caption">No hubo anuncios con conversaciones de Whatsapp en esta semana.</p>{% endif %}
     </div>
   </section>
 
   <section>
     <h2>Top anuncios por Formularios generados</h2>
-    <p class="caption" style="margin-top:-8px;margin-bottom:16px;">Anuncios que mas formularios/leads generaron en {{ kpi_period_label }} (se suman todas las copias del mismo anuncio en distintas campañas).</p>
+    <p class="caption" style="margin-top:-8px;margin-bottom:16px;">Anuncios que mas formularios/leads generaron en la semana del {{ kpi_period_label }} (se suman todas las copias del mismo anuncio en distintas campañas).</p>
     <div class="ad-grid">
       {% for ad in top_ads_leads %}
       <div class="ad-card">
@@ -249,7 +240,7 @@
         </div>
       </div>
       {% endfor %}
-      {% if not top_ads_leads %}<p class="caption">No hubo anuncios con formularios en este periodo.</p>{% endif %}
+      {% if not top_ads_leads %}<p class="caption">No hubo anuncios con formularios en esta semana.</p>{% endif %}
     </div>
   </section>
   {% endif %}
@@ -257,7 +248,7 @@
   <section>
     <h2>Insights clave</h2>
     <div class="insight-box">
-      <h3>Lecturas del mes</h3>
+      <h3>Lecturas de la semana (vs. semana anterior)</h3>
       <ul>
         {% for insight in insights %}
         <li>{{ insight }}</li>
@@ -270,7 +261,7 @@
 
 {% if archive_url %}
 <div style="text-align:center;margin-bottom:20px;">
-  <a href="{{ archive_url }}" style="color:var(--red);font-size:13px;text-decoration:none;">Ver reportes de meses anteriores →</a>
+  <a href="{{ archive_url }}" style="color:var(--red);font-size:13px;text-decoration:none;">Ver reportes de semanas anteriores →</a>
 </div>
 {% endif %}
 <footer>{{ agency_name }} — generado automaticamente el {{ generated_date }}</footer>
@@ -284,8 +275,6 @@ const NAVY = '#132A3E';
 const RED = '#E15241';
 
 const reach = {{ reach_json }};
-const cost = {{ cost_json }};
-const freq = {{ freq_json }};
 const wa = {{ whatsapp_json }};
 const form = {{ leads_json }};
 const calls = {{ calls_json }};
@@ -297,15 +286,6 @@ new Chart(document.getElementById('reachChart'), {
   data: { labels: months, datasets: [{ label:'Alcance', data:reach, borderColor:RED, backgroundColor:'rgba(225,82,65,0.08)', fill:true, tension:0.3, borderWidth:3, pointRadius:4, pointBackgroundColor:RED }]},
   options: { responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}},
     scales:{ y:{grid:{color:grid},ticks:{color:muted,callback:v=>v.toLocaleString()}}, x:{grid:{display:false},ticks:{color:muted}} } }
-});
-
-new Chart(document.getElementById('costFreqChart'), {
-  data: { labels:months, datasets:[
-    {type:'bar',label:'Costo',data:cost,backgroundColor:NAVY,borderRadius:4,yAxisID:'y'},
-    {type:'line',label:'Frecuencia',data:freq,borderColor:RED,backgroundColor:RED,borderWidth:3,tension:0.3,pointRadius:4,yAxisID:'y1'}
-  ]},
-  options: { responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}},
-    scales:{ y:{position:'left',grid:{color:grid},ticks:{color:muted,callback:v=>'$'+v.toLocaleString()}}, y1:{position:'right',grid:{display:false},ticks:{color:muted}}, x:{grid:{display:false},ticks:{color:muted}} } }
 });
 
 new Chart(document.getElementById('leadsChart'), {

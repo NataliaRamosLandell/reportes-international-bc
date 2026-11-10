@@ -20,8 +20,6 @@ from jinja2 import Template
 GRAPH_API_VERSION = "v25.0"
 GRAPH_API_BASE = f"https://graph.facebook.com/{GRAPH_API_VERSION}"
 WA_ACTION = "onsite_conversion.messaging_conversation_started_7d"
-# Subir este numero fuerza a regenerar UNA vez todos los meses del historial.
-BACKFILL_VERSION = "2"
 
 
 def get_access_token():
@@ -671,16 +669,16 @@ def build_insights(current, previous, top_ads=None):
     if r_prev:
         pct = round((r_cur - r_prev) / r_prev * 100, 1)
         direction = "subió" if pct >= 0 else "cayó"
-        insights.append(f"El alcance {direction} {abs(pct)}% respecto al periodo anterior ({r_prev:,} → {r_cur:,}).")
+        insights.append(f"El alcance {direction} {abs(pct)}% respecto a la semana anterior ({r_prev:,} → {r_cur:,}).")
     elif r_cur:
-        insights.append(f"Se alcanzaron {r_cur:,} personas en este periodo (no hay periodo anterior comparable).")
+        insights.append(f"Se alcanzaron {r_cur:,} personas en esta semana (no hay semana anterior comparable).")
 
     if leads_prev:
         pct = round((leads_cur - leads_prev) / leads_prev * 100, 1)
         direction = "aumentaron" if pct >= 0 else "cayeron"
-        insights.append(f"Los resultados totales (whatsapp + formularios + llamadas) {direction} {abs(pct)}% respecto al periodo anterior ({leads_prev} → {leads_cur}).")
+        insights.append(f"Los resultados totales (whatsapp + formularios + llamadas) {direction} {abs(pct)}% respecto a la semana anterior ({leads_prev} → {leads_cur}).")
     elif leads_cur:
-        insights.append(f"Se generaron {leads_cur} resultados totales (whatsapp + formularios + llamadas) en este periodo.")
+        insights.append(f"Se generaron {leads_cur} resultados totales (whatsapp + formularios + llamadas) en esta semana.")
 
     if leads_cur and s_cur:
         cpl_cur = s_cur / leads_cur
@@ -689,7 +687,7 @@ def build_insights(current, previous, top_ads=None):
             cpl_prev = s_prev / leads_prev
             pct = round((cpl_cur - cpl_prev) / cpl_prev * 100, 1)
             direction = "más caro" if pct >= 0 else "más barato"
-            line += f", {abs(pct)}% {direction} que el periodo anterior (${cpl_prev:,.2f} MXN)."
+            line += f", {abs(pct)}% {direction} que la semana anterior (${cpl_prev:,.2f} MXN)."
         else:
             line += "."
         insights.append(line)
@@ -701,7 +699,7 @@ def build_insights(current, previous, top_ads=None):
         partes = [f"{round(v / leads_cur * 100)}% de {n}" for n, v in canales]
         dominante = max(canales, key=lambda x: x[1])[0]
         insights.append("Los resultados se repartieron así: " + ", ".join(partes)
-                        + f". El canal dominante este periodo fue {dominante}.")
+                        + f". El canal dominante esta semana fue {dominante}.")
 
     if top_ads:
         wa_winner = top_ads.get("whatsapp") or []
@@ -711,7 +709,7 @@ def build_insights(current, previous, top_ads=None):
         if leads_winner:
             insights.append(f'El anuncio con más formularios fue "{leads_winner[0]["name"][:60]}" ({leads_winner[0]["leads"]} formularios).')
 
-    return insights or ["Sin cambios significativos respecto al periodo anterior."]
+    return insights or ["Sin cambios significativos respecto a la semana anterior."]
 
 
 def fix_archive_links(archive_dir):
@@ -730,21 +728,54 @@ def fix_archive_links(archive_dir):
             f.write_text(fixed, encoding="utf-8")
 
 
+MESES_ES = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio",
+            "agosto", "septiembre", "octubre", "noviembre", "diciembre"]
+
+
+def week_label(start, end):
+    """Texto de una semana: '2 al 8 de noviembre 2026' o
+    '26 de octubre al 1 de noviembre 2026'."""
+    if start.month == end.month and start.year == end.year:
+        return f"{start.day} al {end.day} de {MESES_ES[end.month - 1]} {end.year}"
+    start_txt = f"{start.day} de {MESES_ES[start.month - 1]}"
+    if start.year != end.year:
+        start_txt += f" {start.year}"
+    return f"{start_txt} al {end.day} de {MESES_ES[end.month - 1]} {end.year}"
+
+
+def last_full_week(today):
+    """Ultima semana completa (lunes a domingo) antes de hoy."""
+    last_sunday = today - timedelta(days=today.weekday() + 1)
+    return last_sunday - timedelta(days=6), last_sunday
+
+
 def build_archive_index(archive_dir, client_name, agency_name, main_filename):
-    meses_es = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio",
-                "agosto", "septiembre", "octubre", "noviembre", "diciembre"]
     archivos = sorted(archive_dir.glob("*.html"), reverse=True)
     archivos = [f for f in archivos if f.name != "index.html" and not f.name.startswith("_")]
 
-    filas = []
+    semanales, mensuales = [], []
     for f in archivos:
         slug = f.stem
+        partes = slug.split("-")
         try:
-            year, month = slug.split("-")
-            label = f"{meses_es[int(month) - 1].capitalize()} {year}"
+            if len(partes) == 3:
+                start = datetime.strptime(slug, "%Y-%m-%d").date()
+                label = "Semana del " + week_label(start, start + timedelta(days=6))
+                semanales.append(f'<li><a href="{f.name}">{label}</a></li>')
+                continue
+            year, month = partes
+            label = f"{MESES_ES[int(month) - 1].capitalize()} {year}"
         except (ValueError, IndexError):
             label = slug
-        filas.append(f'<li><a href="{f.name}">{label}</a></li>')
+        mensuales.append(f'<li><a href="{f.name}">{label}</a></li>')
+
+    bloques = ""
+    if semanales:
+        bloques += f'<h2>Reportes semanales</h2><ul>{"".join(semanales)}</ul>'
+    if mensuales:
+        bloques += f'<h2>Reportes mensuales anteriores</h2><ul>{"".join(mensuales)}</ul>'
+    if not bloques:
+        bloques = "<ul><li>Aun no hay reportes archivados.</li></ul>"
 
     html = f"""<!DOCTYPE html>
 <html lang="es">
@@ -754,6 +785,7 @@ def build_archive_index(archive_dir, client_name, agency_name, main_filename):
 <style>
   body{{font-family:Calibri,Arial,sans-serif;background:#FAFAF8;color:#1B2A3B;max-width:600px;margin:60px auto;padding:0 20px;}}
   h1{{font-size:22px;}}
+  h2{{font-size:16px;color:#63707D;margin-top:28px;}}
   ul{{list-style:none;padding:0;}}
   li{{margin-bottom:10px;}}
   a{{color:#E15241;font-size:16px;text-decoration:none;}}
@@ -763,27 +795,18 @@ def build_archive_index(archive_dir, client_name, agency_name, main_filename):
 </head>
 <body>
   <h1>Historial de reportes — {client_name}</h1>
-  <ul>
-    {"".join(filas) if filas else "<li>Aun no hay reportes archivados.</li>"}
-  </ul>
+  {bloques}
   <a class="back" href="../{main_filename}">← Volver al reporte mas reciente</a>
 </body>
 </html>"""
     (archive_dir / "index.html").write_text(html, encoding="utf-8")
 
 
-
-def month_bounds(year, month):
-    start = date(year, month, 1)
-    nxt = date(year + (month == 12), (month % 12) + 1, 1)
-    return start, nxt - timedelta(days=1)
-
-
 def build_report(config, token, account_ids, since, chart_until,
                  kpi_start, kpi_until, kpi_period_label, write_main=True):
-    """Genera un reporte completo para el periodo kpi_start -> kpi_until.
-    write_main=False se usa al rellenar meses anteriores: solo guarda la
-    copia en archivo/ y no toca el reporte principal."""
+    """Genera el reporte de la semana kpi_start (lunes) -> kpi_until (domingo).
+    Las graficas siguen siendo mensuales (desde 'since' hasta chart_until).
+    write_main=False solo guarda la copia en archivo/."""
     monthly = fetch_monthly_insights(account_ids, token, since, chart_until)
 
     range_data = fetch_range_insights(account_ids, token, kpi_start, kpi_until)
@@ -864,8 +887,6 @@ def build_report(config, token, account_ids, since, chart_until,
         archive_url=archive_url,
         months_json=json.dumps(monthly["months"]),
         reach_json=json.dumps(monthly["reach"]),
-        cost_json=json.dumps(monthly["spend"]),
-        freq_json=json.dumps(monthly["freq"]),
         whatsapp_json=json.dumps(monthly["whatsapp"]),
         leads_json=json.dumps(monthly["leads"]),
         generated_date=date.today().strftime("%d/%m/%Y"),
@@ -881,7 +902,7 @@ def build_report(config, token, account_ids, since, chart_until,
     if archive_url:
         archive_dir = output_dir / "archivo"
         archive_dir.mkdir(exist_ok=True, parents=True)
-        slug = kpi_start[:7]
+        slug = kpi_start  # lunes de la semana, ej. 2026-11-02
         (archive_dir / f"{slug}.html").write_text(html, encoding="utf-8")
         fix_archive_links(archive_dir)
         build_archive_index(archive_dir, config["client_name"], config.get("agency_name", ""), main_filename)
@@ -900,62 +921,19 @@ def main():
     until = config["until"]
     if str(until).strip().lower() == "today":
         until = date.today().strftime("%Y-%m-%d")
+    until_date = datetime.strptime(until, "%Y-%m-%d").date()
 
-    until_date = datetime.strptime(until, "%Y-%m-%d")
-    meses_es = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio",
-                "agosto", "septiembre", "octubre", "noviembre", "diciembre"]
+    # Resumen semanal: ultima semana completa (lunes a domingo).
+    # Si corre el lunes, es la semana que termino ayer domingo.
+    week_start, week_end = last_full_week(until_date)
+    kpi_start = week_start.strftime("%Y-%m-%d")
+    kpi_until = week_end.strftime("%Y-%m-%d")
+    label = week_label(week_start, week_end)
 
     print(f"Jalando datos de {', '.join(account_ids)}...")
+    print(f"Semana del reporte: {label} ({kpi_start} a {kpi_until})")
 
-    period_days = config.get("period_days")
-    if period_days:
-        kpi_start = (until_date - timedelta(days=period_days - 1)).strftime("%Y-%m-%d")
-        kpi_since_date = datetime.strptime(kpi_start, "%Y-%m-%d")
-        if kpi_since_date.month == until_date.month and kpi_since_date.year == until_date.year:
-            label = (f"{kpi_since_date.day} al {until_date.day} de "
-                     f"{meses_es[until_date.month - 1]} {until_date.year}")
-        else:
-            same_year = kpi_since_date.year == until_date.year
-            start_txt = f"{kpi_since_date.day} de {meses_es[kpi_since_date.month - 1]}"
-            if not same_year:
-                start_txt += f" {kpi_since_date.year}"
-            end_txt = f"{until_date.day} de {meses_es[until_date.month - 1]} {until_date.year}"
-            label = f"{start_txt} al {end_txt}"
-        kpi_until = until
-    else:
-        first_of_this_month = until_date.replace(day=1)
-        last_month_end_date = first_of_this_month - timedelta(days=1)
-        kpi_start = last_month_end_date.replace(day=1).strftime("%Y-%m-%d")
-        kpi_until = last_month_end_date.strftime("%Y-%m-%d")
-        label = f"{meses_es[last_month_end_date.month - 1]} {last_month_end_date.year}"
-
-    # Rellenar meses anteriores (solo los que aun no existen en archivo/).
-    backfill_from = config.get("backfill_from")
-    if backfill_from and not period_days:
-        archive_dir = Path(__file__).parent / config.get("output_dir", "output") / "archivo"
-        archive_dir.mkdir(exist_ok=True, parents=True)
-        marker = archive_dir / "_version.html"
-        marker_text = marker.read_text(encoding="utf-8") if marker.exists() else ""
-        force = f"backfill v{BACKFILL_VERSION}" not in marker_text
-        if force:
-            print("Regenerando todo el historial (cambio de version del calculo)...")
-        cur = datetime.strptime(backfill_from[:7] + "-01", "%Y-%m-%d").date()
-        last_full = datetime.strptime(kpi_start, "%Y-%m-%d").date()
-        while cur < last_full:
-            slug = cur.strftime("%Y-%m")
-            if (archive_dir / f"{slug}.html").exists() and not force:
-                print(f"Archivo {slug} ya existe, se omite.")
-            else:
-                start, end = month_bounds(cur.year, cur.month)
-                print(f"Generando archivo de {slug}...")
-                build_report(
-                    config, token, account_ids, since, end.strftime("%Y-%m-%d"),
-                    start.strftime("%Y-%m-%d"), end.strftime("%Y-%m-%d"),
-                    f"{meses_es[cur.month - 1]} {cur.year}", write_main=False,
-                )
-            cur = date(cur.year + (cur.month == 12), (cur.month % 12) + 1, 1)
-        marker.write_text(f"<!-- backfill v{BACKFILL_VERSION} -->", encoding="utf-8")
-
+    # Las graficas mensuales van desde 'since' hasta hoy.
     build_report(config, token, account_ids, since, until, kpi_start, kpi_until, label, write_main=True)
 
 
